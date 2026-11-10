@@ -132,6 +132,11 @@ The contours are calculated with `ctmm::SpatialPolygonsDataFrame.UD()` and the
 areas with ctmm's `summary()` method for UDs, both at the selected isopleth
 level. The rasters are written with ctmm's `writeRaster()` method for UDs.
 
+Note: ctmm 1.3.x does not mark holes within a contour. This App identifies
+nested contour rings so that areas inside the outer contour that are not part
+of the home range area at the selected isopleth level are left out of the
+output polygons.
+
 The aKDE method is described in Fleming, C. H., Fagan, W. F., Mueller, T.,
 Olson, K. A., Leimgruber, P., & Calabrese, J. M. (2015). Rigorous home range
 estimation with movement data: A new autocorrelated kernel density estimator.
