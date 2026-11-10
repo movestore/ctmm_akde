@@ -83,15 +83,25 @@
   ],
   "funding": [
     {
-      "name": " NSF award 1914928",
+      "name": "NSF award 1914928",
       "comment": "Grant for developing the app"
     }
   ],
   "references": [
     {
       "type": "IsDescribedBy",
-      "note": "Documentation of the `akde()`-function",
+      "note": "Fleming, C. H., Fagan, W. F., Mueller, T., Olson, K. A., Leimgruber, P., & Calabrese, J. M. (2015). Rigorous home range estimation with movement data: A new autocorrelated kernel density estimator. Ecology, 96(5), 1182-1188.",
+      "url": "https://doi.org/10.1890/14-2010.1"
+    },
+    {
+      "type": "IsDocumentedBy",
+      "note": "Documentation of the `akde()` function",
       "url": "https://ctmm-initiative.github.io/ctmm/reference/akde.html"
+    },
+    {
+      "type": "Requires",
+      "note": "Calabrese, J. M., Fleming, C. H., & Gurarie, E. (2016). ctmm: An R package for analyzing animal relocation data as a continuous-time stochastic process. Methods in Ecology and Evolution, 7(9), 1124-1132.",
+      "url": "https://CRAN.R-project.org/package=ctmm"
     }
   ]
 }
