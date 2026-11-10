@@ -49,7 +49,7 @@ the *Variogram* App to evaluate whether this property holds for your data.
 2. The tracking data (an object of type `telemetry.list`).
 
 ### Output type
-`ctmm UD with Data and Model`: a list with three elements:
+`ctmm ud with data`: a list with three elements:
 
 1. `model`: the list of `ctmm` models from the input.
 2. `uds`: a list containing the aKDE UD (an object of class `UD`) for each
@@ -64,7 +64,7 @@ The artefacts reflect the **Isopleth level** selected in the App.
 Each animal has three polygons: the estimate and the lower and upper bounds of
 its 95% confidence interval. The `name` column identifies each polygon, e.g.
 "Cilla 95% est", "Cilla 95% low" or "Cilla 95% high". The coordinates are in
-the projection of the tracking data (in meters).
+the local map projection that ctmm uses for the tracking data.
 
 `akde_summary.csv`: the estimated home range area of each animal. It contains
 the following columns:
@@ -75,9 +75,9 @@ the following columns:
     its 95% confidence interval.
 
 `uds.zip`: a zip archive with one GeoTIFF file per animal (`<animal>.tif`)
-containing its UD on a raster grid. Each cell's value represents the smallest
-isopleth level whose home range contains that cell (e.g. cells inside the 50%
-core area have values below 0.5). The coordinates are in the projection of the
+containing its UD on a raster grid. Each cell's value is the probability that
+the animal will be found within the contour line passing through that cell.
+The coordinates are in the local map projection that ctmm uses for the
 tracking data.
 
 ### Settings
@@ -131,6 +131,11 @@ its own fitted model.
 The contours are calculated with `ctmm::SpatialPolygonsDataFrame.UD()` and the
 areas with ctmm's `summary()` method for UDs, both at the selected isopleth
 level. The rasters are written with ctmm's `writeRaster()` method for UDs.
+
+Note: ctmm 1.3.x does not mark holes within a contour. This App identifies
+nested contour rings so that areas inside the outer contour that are not part
+of the home range area at the selected isopleth level are left out of the
+output polygons.
 
 The aKDE method is described in Fleming, C. H., Fagan, W. F., Mueller, T.,
 Olson, K. A., Leimgruber, P., & Calabrese, J. M. (2015). Rigorous home range
