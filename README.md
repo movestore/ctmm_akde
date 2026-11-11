@@ -70,7 +70,7 @@ the local map projection that ctmm uses for the tracking data.
 the following columns:
   - `id`: the name of the animal.
   - `level`: the isopleth level.
-  - `unit`: the unit of the home range area (always square meters).
+  - `parameter`: the parameter name and its unit (always `area (square meters)`).
   - `low`, `est`, `high`: the estimated area and the lower and upper bounds of
     its 95% confidence interval.
 
