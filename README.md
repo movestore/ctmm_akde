@@ -5,7 +5,7 @@ MoveApps
 GitHub repository: https://github.com/movestore/ctmm_akde
 
 <p align="center">
-  <img alt="Screenshot of the Apps UI" src="readme_thumbnail.png" width="700">
+  <img alt="Screenshot of the App's UI" src="readme_thumbnail.png" width="700">
 </p>
 
 ## Description
