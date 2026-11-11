@@ -8,6 +8,10 @@ library(zip)
 library(shinycssloaders)
 library(leafem)
 
+# Default isopleth level. Used for the slider and whenever the slider has no
+# value, e.g. when the App runs in a workflow without its UI being opened.
+default_level <- 0.95
+
 # Generate contour polygons for the home range at the given isopleth level.
 # This ensures that internal holes within the home range contours are
 # correctly left unfilled. At the time of writing, there is a bug in ctmm
@@ -49,7 +53,7 @@ shinyModuleUserInterface <- function(id, label) {
              sliderInput(
                ns("isopleth_levels"),
                "Isopleth level:",
-               min = 0.01, max = .99, value = .95
+               min = 0.01, max = .99, value = default_level
              ),
       ), 
       column(4, 
@@ -78,18 +82,21 @@ shinyModule <- function(input, output, session, data){ ## The parameter "data" i
     map(st_bbox)
   bbx <- do.call(rbind, bbx)
   
+  # Selected isopleth level, or the default if the UI has not been opened
+  level <- reactive(input$isopleth_levels %||% default_level)
+
   # Home-range contours at the chosen isopleth level: a list with one sf
   # object per animal, in the same order and with the same names as hr
   hr.iso <- reactive({
-    req(input$isopleth_levels)
-    akde_sf <- map(hr, ~ ud_contours(.x, level.UD = input$isopleth_levels))
+    map(hr, ~ ud_contours(.x, level.UD = level()))
+  })
 
-    # export as geopackage
-    akde_sf |>
+  # Artefact: home range contours as a geopackage. Written independently of
+  # the map so that it is produced even if the UI is never opened.
+  observe({
+    hr.iso() |>
       bind_rows() |>
       sf::st_write(appArtifactPath("homerange.gpkg"), append = FALSE)
-
-    akde_sf
   })
 
   # The same contours for the map. Each contour's name ends in "low", "est"
@@ -189,11 +196,10 @@ shinyModule <- function(input, output, session, data){ ## The parameter "data" i
   
   # Artefact: summary
   observe({
-    req(input$isopleth_levels)
-    xx <- map(hr, ~ summary(.x, level.UD = input$isopleth_levels)$CI)
+    xx <- map(hr, ~ summary(.x, level.UD = level())$CI)
     xx <- do.call(rbind, xx)
     xx |> as_tibble() |> 
-      mutate(id = names(hr), unit = rownames(xx), level = input$isopleth_levels) |> 
+      mutate(id = names(hr), unit = rownames(xx), level = level()) |> 
       select(id, level, unit, low, est, high) |> 
       write.csv(appArtifactPath("akde_summary.csv"), row.names = FALSE)
   })
