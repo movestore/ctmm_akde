@@ -47,6 +47,8 @@ test_that("happy path", {
   cilla <- areas[areas$id == "Cilla", ]
   expect_lt(cilla$est[cilla$level == 0.5], cilla$est[cilla$level == 0.95])
 
+  expect_gt(file.size(file.path(artifacts_dir, "akde_plots.pdf")), 0)
+
   # Rasters: one per animal
   expect_setequal(zip::zip_list(file.path(artifacts_dir, "uds.zip"))$filename, c("Cilla.tif", "Mvubu.tif"))
 })
