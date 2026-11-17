@@ -1,16 +1,91 @@
-library(shiny)
+library(moveapps)
 library(ctmm)
 library(sf)
-library(dplyr)
-library(purrr)
-library(leaflet)
-library(zip)
-library(shinycssloaders)
-library(leafem)
 
-# Default isopleth level. Used for the slider and whenever the slider has no
-# value, e.g. when the App runs in a workflow without its UI being opened.
-default_level <- 0.95
+rFunction <- function(data, isopleth_levels) {
+  lvls <- parse_levels(isopleth_levels)
+
+  models <- data[[1]]
+  telemetry <- data[[2]]
+
+  logger.info(
+    paste0(
+      "Estimating aKDE home ranges for ", length(telemetry),
+      " animal(s) at isopleth level(s) ", paste(lvls, collapse = ", ")
+    )
+  )
+  
+  hr <- akde(telemetry, models)
+  
+  # Artefact: home range contours of all animals at all levels
+  contours <- purrr::list_rbind(
+    purrr::imap(hr, function(rng, id) animal_contours(rng, id, lvls))
+  )
+  
+  sf::st_write(
+    contours,
+    appArtifactPath("homerange.gpkg"),
+    append = FALSE,
+    quiet = TRUE
+  )
+
+  # Artefact: home range areas
+  areas <- purrr::list_rbind(
+    purrr::imap(hr, function(rng, id) animal_summary(rng, id, lvls))
+  )
+  
+  write.csv(areas, appArtifactPath("akde_summary.csv"), row.names = FALSE)
+
+  # Artefact: one UD raster per animal. These do not depend on the isopleth level.
+  targetDirUDs <- tempfile("uds")
+  dir.create(targetDirUDs)
+  
+  purrr::walk(
+    names(hr),
+    function(id) {
+      writeRaster(
+        hr[[id]],
+        file.path(targetDirUDs, paste0(id, ".tif")),
+        overwrite = TRUE
+      )
+    }
+  )
+  
+  zip::zip(
+    zipfile = appArtifactPath("uds.zip"),
+    files = list.files(targetDirUDs, full.names = TRUE, pattern = "tif$"),
+    mode = "cherry-pick"
+  )
+
+  # List elements need names for cargo agent analyzer. Note that some apps
+  # may consume this output with positional matching though.
+  list(model = models, uds = hr, data = telemetry)
+}
+
+
+# Convert isopleth level setting (comma delimited string) into a sorted
+# vector of unique numbers. Stops with a message if any value is not a number
+# strictly between 0 and 1.
+parse_levels <- function(isopleth_levels) {
+  if (is.null(isopleth_levels) || all(trimws(isopleth_levels) == "")) {
+    stop("No isopleth level given. Enter one or more levels between 0 and 1, ",
+         "separated by commas (e.g. \"0.5, 0.95\").", call. = FALSE)
+  }
+  
+  parts <- trimws(unlist(strsplit(as.character(isopleth_levels), ",")))
+  levels <- suppressWarnings(as.numeric(parts))
+  
+  bad <- parts[is.na(levels) | levels <= 0 | levels >= 1]
+  
+  if (length(bad) > 0) {
+    stop("Invalid isopleth level(s): ", paste0("\"", bad, "\"", collapse = ", "),
+         ". Each level must be a number between 0 and 1, separated by commas ",
+         "(e.g. \"0.5, 0.95\"). For a 95% home range, enter 0.95, not 95.",
+         call. = FALSE)
+  }
+  
+  sort(unique(levels))
+}
 
 # Generate contour polygons for the home range at the given isopleth level.
 # This ensures that internal holes within the home range contours are
@@ -44,183 +119,44 @@ ud_contours <- function(ud, level.UD) {
   )
 }
 
-shinyModuleUserInterface <- function(id, label) {
-  ns <- NS(id) ## all IDs of UI functions need to be wrapped in ns()
-  tagList(
-    titlePanel("Autocorrelated Kernel Density Estimate"),
-    fluidRow(
-      column(4,
-             sliderInput(
-               ns("isopleth_levels"),
-               "Isopleth level:",
-               min = 0.01, max = .99, value = default_level
-             ),
-      ), 
-      column(4, 
-             checkboxGroupInput(ns("what"), "What do you want to see?", c("Lower CI" = "low", "Estimate" = "est", "Upper CI" = "high"), selected = "est")
-      ),
-      column(4, 
-             sliderInput(ns("opacity"), "Opacity", min = 0, max = 1, value = 0.5),
-             div(
-               style = "display: flex; flex-wrap: wrap; gap: 6px;",
-               actionButton(ns("add_all"), label = "Add all animals to map", class = "btn-sm"),
-               actionButton(ns("clear"), label = "Remove all animals from map", class = "btn-sm")
-             )
-      ) 
-    ),
-    hr(),
-    shinycssloaders::withSpinner(leafletOutput(ns("map"), height = "600"))
-  )
-}
-
-shinyModule <- function(input, output, session, data){ ## The parameter "data" is reserved for the data object passed on from the previous app
-  ns <- session$ns ## all IDs of UI functions need to be wrapped in ns()
-  
-  hr <- akde(data[[2]], data[[1]])
-  bbx <- map(hr, ~ st_as_sf(ctmm::SpatialPolygonsDataFrame.UD(.x, level.UD = 0.97)) |> 
-               st_transform(4326)) |> 
-    map(st_bbox)
-  bbx <- do.call(rbind, bbx)
-  
-  # Selected isopleth level, or the default if the UI has not been opened
-  level <- reactive(input$isopleth_levels %||% default_level)
-
-  # Home-range contours at the chosen isopleth level: a list with one sf
-  # object per animal, in the same order and with the same names as hr
-  hr.iso <- reactive({
-    map(hr, ~ ud_contours(.x, level.UD = level()))
-  })
-
-  # Artefact: home range contours as a geopackage. Written independently of
-  # the map so that it is produced even if the UI is never opened.
-  observe({
-    hr.iso() |>
-      bind_rows() |>
-      sf::st_write(appArtifactPath("homerange.gpkg"), append = FALSE)
-  })
-
-  # The same contours for the map. Each contour's name ends in "low", "est"
-  # or "high" (e.g. "Cilla 95% est") so that contours can be selected interactively
-  hr.leaflet <- reactive({
-    map(
-      hr.iso(),
-      function(akde_sf) {
-        akde_sf$what <- sub(".* ", "", akde_sf$name)
-        st_transform(akde_sf, 4326)
-      }
-    )
-  })
-  
-  output$map <- renderLeaflet({
-    
-    
-    leaflet() |> 
-      addTiles(group = "OSM") |> 
-      addProviderTiles(providers$Esri.WorldImagery,
-                       options = providerTileOptions(noWrap = TRUE), group = "World Imagery") |>
-      fitBounds(min(bbx[, 1]), min(bbx[, 2]), max(bbx[, 3]), max(bbx[, 4])) |> 
-      addHomeButton(
-        ext = c(min(bbx[, 1]), min(bbx[, 2]), max(bbx[, 3]), max(bbx[, 4])), 
-        group = "Full extent", position = "bottomleft")
-    
-  })
-  
-  cols <- rainbow(length(hr))
-  
-  observe({
-    # Wait for the opacity slider before drawing. Don't wait for input$what
-    # as the user may deselect all options and the map still needs to update
-    req(input$opacity)
-    m <- leafletProxy("map") |>
-      clearShapes() |> 
-      clearControls()
-    for (i in 1:length(hr.leaflet())) {
-      if ("est" %in% input$what) {
-        m <- m |> addPolygons(data = hr.leaflet()[[i]] |> 
-                                filter(what == "est"), 
-                              group = names(hr.leaflet())[i],
-                              label = ~name,
-                              color = cols[i],
-                              fillColor = cols[i],
-                              fillOpacity = input$opacity)
-      }
+# Get contours of one animal's UD at each isopleth level. Each row represents
+# a contour for an animal, level, and estimate type (estimate or CI)
+animal_contours <- function(ud, id, levels) {
+  lvl_contours <- purrr::map(
+    levels,
+    function(lvl) {
+      contours <- ud_contours(ud, level.UD = lvl)
       
-      if ("low" %in% input$what) {
-        m <- m |> addPolygons(data = hr.leaflet()[[i]] |> 
-                                filter(what == "low"),
-                              group = names(hr.leaflet())[i],
-                              label = ~name,
-                              dashArray = "3", weight = 1,
-                              opacity = 1,
-                              color = "white",
-                              fill = FALSE)
-        
-      } 
-      
-      if ("high" %in% input$what) {
-        m <- m |> addPolygons(data = hr.leaflet()[[i]] |> 
-                                filter(what == "high"),
-                              group = names(hr.leaflet())[i],
-                              label = ~name,
-                              dashArray = "3", weight = 1,
-                              color = "white",
-                              opacity = 1,
-                              fill = FALSE)
-        
-      }
+      contours$id <- id
+      contours$level <- lvl
+      contours$estimate <- sub(".* ", "", contours$name)
+      contours[, c("id", "level", "estimate", "name")]
     }
-    m |> 
-      addLayersControl(
-        baseGroups = c("OSM", "World Imagery"),
-        overlayGroups = names(hr.leaflet()),
-        options = layersControlOptions(collapsed = TRUE)
-      ) |> 
-      addLegend(
-        position = "bottomright",
-        colors = cols,
-        labels  = names(hr)) 
-    
-  })
-  # The two buttons are left out of saved settings. Otherwise restoring them
-  # would count as a click and hide or show the animals when the App opens.
-  setBookmarkExclude(c("add_all", "clear"))
-  observeEvent(input$add_all, {
-    leafletProxy("map") |>
-      showGroup(names(hr.leaflet()))
-  })
-  observeEvent(input$clear, {
-    leafletProxy("map") |>
-      hideGroup(names(hr.leaflet()))
-  })
-  
-  
-  # Artefact: summary. units = FALSE reports every area in square meters so
-  # that values are comparable across animals.
-  observe({
-    xx <- map(hr, ~ summary(.x, level.UD = level(), units = FALSE)$CI)
-    xx <- do.call(rbind, xx)
-    xx |> as_tibble() |> 
-      mutate(id = names(hr), parameter = rownames(xx), level = level()) |> 
-      select(id, level, parameter, low, est, high) |> 
-      write.csv(appArtifactPath("akde_summary.csv"), row.names = FALSE)
-  })
-  
-  # Artefact: tifs
-  targetDirUDs <- tempfile("uds")
-  dir.create(targetDirUDs)
-  
-  r <- lapply(names(hr), function(x) 
-    writeRaster(hr[[x]], file.path(targetDirUDs, paste0(x, ".tif")), overwrite = TRUE))
-  
-  zip::zip(
-    zipfile = appArtifactPath("uds.zip"),
-    files = list.files(targetDirUDs, full.names = TRUE, pattern = "tif$"),
-    mode = "cherry-pick"
   )
   
-  # List elements need names for cargo agent analyzer. Note that some apps
-  # may consume this output with positional matching though.
-  return(reactive({
-    list(model = data[[1]], uds = hr, data = data[[2]])
-  }))
+  purrr::list_rbind(lvl_contours)
 }
+
+# Get home range area of one animal at each isopleth level, in square meters
+# so that values are comparable across animals and levels.
+animal_summary <- function(ud, id, levels) {
+  lvl_summaries <- purrr::map(
+    levels,
+    function(lvl) {
+      ci <- summary(ud, level.UD = lvl, units = FALSE)$CI
+      
+      data.frame(
+        id = id,
+        level = lvl,
+        parameter = rownames(ci),
+        low = ci[, "low"],
+        est = ci[, "est"],
+        high = ci[, "high"],
+        row.names = NULL
+      )
+    }
+  )
+  
+  purrr::list_rbind(lvl_summaries)
+}
+

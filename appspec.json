@@ -1,34 +1,27 @@
 {
   "version": "1.2",
-  "settings": [],
+  "settings": [
+    {
+      "id": "isopleth_levels",
+      "name": "Isopleth level(s)",
+      "description": "One or more coverage levels of the home range, between 0 and 1 and separated by commas. For example, 0.95 gives the smallest area in which the animal is found with 95% probability.",
+      "defaultValue": "0.5, 0.95",
+      "type": "STRING"
+    }
+  ],
   "dependencies": {
     "R": [
       {
-        "name": "shiny"
-      },
-      {
-        "name": "shinycssloaders"
-      },
-      {
-        "name": "leafem"
-      },
-      {
-        "name": "dplyr"
-      },
-      {
         "name": "ctmm"
-      },
-      {
-        "name": "purrr"
       },
       {
         "name": "sf"
       },
       {
-        "name": "leaflet"
+        "name": "zip"
       },
       {
-        "name": "zip"
+        "name": "purrr"
       }
     ]
   },
