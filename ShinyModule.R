@@ -194,13 +194,14 @@ shinyModule <- function(input, output, session, data){ ## The parameter "data" i
   })
   
   
-  # Artefact: summary
+  # Artefact: summary. units = FALSE reports every area in square meters so
+  # that values are comparable across animals.
   observe({
-    xx <- map(hr, ~ summary(.x, level.UD = level())$CI)
+    xx <- map(hr, ~ summary(.x, level.UD = level(), units = FALSE)$CI)
     xx <- do.call(rbind, xx)
     xx |> as_tibble() |> 
-      mutate(id = names(hr), unit = rownames(xx), level = level()) |> 
-      select(id, level, unit, low, est, high) |> 
+      mutate(id = names(hr), parameter = rownames(xx), level = level()) |> 
+      select(id, level, parameter, low, est, high) |> 
       write.csv(appArtifactPath("akde_summary.csv"), row.names = FALSE)
   })
   
