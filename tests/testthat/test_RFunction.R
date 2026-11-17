@@ -49,6 +49,12 @@ test_that("happy path", {
 
   expect_gt(file.size(file.path(artifacts_dir, "akde_plots.pdf")), 0)
 
+  # Map: a single HTML file with a hover label for each contour
+  map <- readLines(file.path(artifacts_dir, "akde_map.html"), warn = FALSE)
+  expect_true(any(grepl("\"Cilla, 95% range\"", map, fixed = TRUE)))
+  expect_true(any(grepl("\"Mvubu, 50% range\"", map, fixed = TRUE)))
+  expect_false(dir.exists(file.path(artifacts_dir, "akde_map_files")))
+
   # Rasters: one per animal
   expect_setequal(zip::zip_list(file.path(artifacts_dir, "uds.zip"))$filename, c("Cilla.tif", "Mvubu.tif"))
 })
