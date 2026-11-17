@@ -9,16 +9,23 @@ rFunction <- function(data, isopleth_levels) {
   models <- data[[1]]
   telemetry <- data[[2]]
 
+  # Time since `start`, for the log, e.g. "3.4 secs" or "2.1 mins"
+  start <- Sys.time()
+  elapsed <- function() format(round(Sys.time() - start, 1))
+
   logger.info(
     paste0(
       "Estimating aKDE home ranges for ", length(telemetry),
-      " animal(s) at isopleth level(s) ", paste(lvls, collapse = ", ")
+      " animal(s) at isopleth level(s) ", paste(lvls, collapse = ", "),
+      ". This can take a while for many animals or long tracks."
     )
   )
   
   hr <- akde(telemetry, models)
+  logger.info(paste0("Home ranges estimated after ", elapsed()))
   
   # Artefact: home range contours of all animals at all levels
+  logger.info("Writing home range contours (homerange.gpkg)")
   contours <- purrr::list_rbind(
     purrr::imap(hr, function(rng, id) animal_contours(rng, id, lvls))
   )
@@ -31,16 +38,21 @@ rFunction <- function(data, isopleth_levels) {
   )
 
   # Artefact: home range areas
+  logger.info("Writing home range areas (akde_summary.csv)")
   areas <- purrr::list_rbind(
     purrr::imap(hr, function(rng, id) animal_summary(rng, id, lvls))
   )
   
   write.csv(areas, appArtifactPath("akde_summary.csv"), row.names = FALSE)
 
+  logger.info("Writing plots (akde_plots.pdf)")
   write_pdf(appArtifactPath("akde_plots.pdf"), telemetry, hr, lvls)
+
+  logger.info("Writing interactive map (akde_map.html)")
   write_map(appArtifactPath("akde_map.html"), contours, hr, lvls)
 
   # Artefact: one UD raster per animal. These do not depend on the isopleth level.
+  logger.info("Writing UD rasters (uds.zip)")
   targetDirUDs <- tempfile("uds")
   dir.create(targetDirUDs)
   
@@ -60,6 +72,7 @@ rFunction <- function(data, isopleth_levels) {
     files = list.files(targetDirUDs, full.names = TRUE, pattern = "tif$"),
     mode = "cherry-pick"
   )
+  logger.info(paste0("All artefacts written after ", elapsed()))
 
   # List elements need names for cargo agent analyzer. Note that some apps
   # may consume this output with positional matching though.
