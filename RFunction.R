@@ -194,26 +194,30 @@ animal_colors <- function(n) {
 area_legend <- function(ud, levels) {
   ci <- lapply(levels, function(level) summary(ud, level.UD = level)$CI)
 
-  unit <- sub(".*\\((.*)\\)", "\\1", rownames(ci[[1]])[1])
   fmt <- function(x) format(signif(x, 3), big.mark = ",")
   cols <- contour_colors(length(levels))
 
+  units <- vapply(ci, function(x) sub(".*\\((.*)\\)", "\\1", rownames(x)[1]), character(1))
+  range_labels <- paste0(levels * 100, "% range (", units, ")")
+
   par(mar = c(0, 0, 4.1, 0))
   plot.new()
-  cex <- 0.9
-  line_height <- 1.5 * strheight("M", cex = cex)
   text_x <- 0.13
+  # Shrink the text if the widest label (e.g. "99.5% range (square
+  # kilometers)") would not fit the panel
+  cex <- min(0.9, 0.9 * 0.95 * (1 - text_x) / max(strwidth(range_labels, cex = 0.9)))
+  line_height <- 1.5 * strheight("M", cex = cex)
 
   y <- 1
   text(0, y, "Home range area", adj = c(0, 1), cex = cex, font = 2)
   y <- y - line_height
-  text(0, y, paste0("(", unit, " with 95% CI)"), adj = c(0, 1), cex = cex)
+  text(0, y, "(with 95% CI)", adj = c(0, 1), cex = cex)
 
   for (i in seq_along(levels)) {
     x <- ci[[i]]
     y <- y - 2 * line_height
     segments(0, y - line_height / 3, 0.1, y - line_height / 3, col = cols[i], lwd = 3)
-    text(text_x, y, paste0(levels[i] * 100, "% range"), adj = c(0, 1), cex = cex)
+    text(text_x, y, range_labels[i], adj = c(0, 1), cex = cex)
     y <- y - line_height
     text(text_x, y, paste0(fmt(x[1, "est"]), " [", fmt(x[1, "low"]), " - ", fmt(x[1, "high"]), "]"),
          adj = c(0, 1), cex = cex)
