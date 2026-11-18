@@ -247,7 +247,9 @@ write_pdf <- function(file, telemetry, hr, levels) {
   for (level in levels) {
     par(mar = plot_mar)
     plot(telemetry, UD = hr, level.UD = level, col = animal_cols,
-         col.UD = animal_cols, col.level = animal_cols, col.grid = NA)
+         col.UD = grDevices::adjustcolor(animal_cols, alpha.f = 0.8),
+         col.level = animal_cols,
+         col.grid = NA)
     title(paste0("All animals: ", level * 100, "% home range"))
     animal_legend(names(hr), animal_cols)
   }
