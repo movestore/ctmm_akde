@@ -58,3 +58,32 @@ test_that("happy path", {
   # Rasters: one per animal
   expect_setequal(zip::zip_list(file.path(artifacts_dir, "uds.zip"))$filename, c("Cilla.tif", "Mvubu.tif"))
 })
+
+# In this fixture, Mvubu's movement model is not range-resident (no home range)
+nonresident_data <- test_data("input2_nonresident.rds")
+
+test_that("animals without a home range are left out of results and output", {
+  # ctmm warns that it returns the model instead of a UD for Mvubu
+  actual <- expect_warning(
+    rFunction(data = nonresident_data, isopleth_levels = "0.5, 0.95"),
+    "Fit object returned"
+  )
+
+  expect_named(actual$model, "Cilla")
+  expect_named(actual$uds, "Cilla")
+  expect_named(actual$data, "Cilla")
+
+  contours <- sf::st_read(file.path(artifacts_dir, "homerange.gpkg"), quiet = TRUE)
+  expect_setequal(contours$id, "Cilla")
+  areas <- read.csv(file.path(artifacts_dir, "akde_summary.csv"))
+  expect_setequal(areas$id, "Cilla")
+  expect_setequal(zip::zip_list(file.path(artifacts_dir, "uds.zip"))$filename, "Cilla.tif")
+})
+
+test_that("the App stops if no animal has a home range", {
+  only_nonresident <- list(nonresident_data[[1]]["Mvubu"], nonresident_data[[2]]["Mvubu"])
+  expect_error(
+    suppressWarnings(rFunction(data = only_nonresident, isopleth_levels = "0.5, 0.95")),
+    "Could not estimate home range"
+  )
+})

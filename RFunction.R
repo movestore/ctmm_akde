@@ -23,7 +23,33 @@ rFunction <- function(data, isopleth_levels) {
   
   hr <- akde(telemetry, models)
   logger.info(paste0("Home ranges estimated after ", elapsed()))
+
+  # akde() returns the model instead of a UD for animals whose model is not
+  # range resident. Remove these from the output and warn.
+  has_range <- purrr::map_lgl(hr, function(x) inherits(x, "UD"))
   
+  if (!any(has_range)) {
+    stop("Could not estimate home range for any of the provided animals. ",
+         "aKDE is not defined for movement models that are not range-resident ",
+         "or tracks that are too short to cover the range.",
+         call. = FALSE)
+  }
+
+  if (!all(has_range)) {
+    logger.warn(
+      paste0(
+        "Could not estimate home range for animal(s): ",
+        paste(names(hr)[!has_range], collapse = ", "), ".\n",
+        "aKDE is not defined for movement models that are not range-resident ",
+        "or tracks that are too short to cover the range.\n",
+        "These animals have been removed from the output."
+      )
+    )
+    hr <- hr[has_range]
+    models <- models[has_range]
+    telemetry <- telemetry[has_range]
+  }
+
   # Artefact: home range contours of all animals at all levels
   logger.info("Writing home range contours (homerange.gpkg)")
   contours <- purrr::list_rbind(
