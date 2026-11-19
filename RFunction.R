@@ -336,6 +336,15 @@ write_map <- function(file, contours, hr, levels) {
     addProviderTiles(providers$Esri.WorldImagery, group = "World Imagery") |>
     fitBounds(bbox[1], bbox[2], bbox[3], bbox[4])
 
+  # Dash patterns that can be mapped to different isopleth levels. This
+  # allows different levels' CIs to be distinguished (though it is still
+  # preferable to look in the static output if there are more than 2 levels)
+  dash_patterns <- c("2 4", "8 4", "12 4 2 4", "1 6", "12 8")
+  dashes <- stats::setNames(
+    rep_len(dash_patterns, length(levels)),
+    as.character(sort(levels))
+  )
+
   # Build layer group for each animal, so animals can be toggled on/off
   for (level in sort(levels, decreasing = TRUE)) {
     for (id in ids) {
@@ -348,7 +357,7 @@ write_map <- function(file, contours, hr, levels) {
           color = cols[[id]],
           weight = 1,
           opacity = 0.8,
-          dashArray = "4",
+          dashArray = dashes[[as.character(level)]],
           fill = FALSE
         ) |>
         addPolygons(
@@ -364,11 +373,25 @@ write_map <- function(file, contours, hr, levels) {
     }
   }
 
+  # Display a legend showing the mapping between levels and CI dash patterns
+  ci_legend <- paste0(
+    sprintf(
+      paste0(
+        "<svg width='40' height='8' style='vertical-align: middle'>",
+        "<line x1='0' y1='4' x2='40' y2='4' stroke='black' stroke-width='2' ",
+        "stroke-dasharray='%s'/></svg> %s%% range"
+      ),
+      dashes, as.numeric(names(dashes)) * 100
+    ),
+    collapse = "<br>"
+  )
+
   m <- m |>
     addControl(
       html = paste0(
         "<b>Home range (aKDE)</b><br>Shaded regions show the estimated ",
-        "home range area<br>Dashed lines show the 95% confidence interval"
+        "home range area<br>Dashed lines show the 95% confidence interval:<br>",
+        ci_legend
       ),
       position = "topright"
     ) |>
