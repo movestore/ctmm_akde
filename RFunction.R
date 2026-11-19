@@ -203,11 +203,13 @@ animal_summary <- function(ud, id, levels) {
   purrr::list_rbind(lvl_summaries)
 }
 
-# Colors for the contours at each isopleth level. Viridis palette starting from
-# teal to dark purple. Stops at teal because lighter viridis palette colors
-# are hard to make out on white background.
+# Colors for the contours at each isopleth level, from the smallest to the
+# largest level. Part of the viridis palette, from teal (inner contours) to
+# dark purple (outer contour). The largest level always gets dark purple, so a
+# single contour is drawn in the most visible colour. Stops at teal because
+# lighter viridis palette colors are hard to make out on white background.
 contour_colors <- function(n) {
-  grDevices::hcl.colors(100, "viridis")[round(seq(55, 5, length.out = n))]
+  grDevices::hcl.colors(100, "viridis")[rev(round(seq(5, 55, length.out = n)))]
 }
 
 # Colour for each animal, used in the PDF overview pages and on the map
