@@ -112,7 +112,7 @@ tracking data.
 ### Settings
 **Isopleth level(s) (`isopleth_levels`):** The desired home range coverage
 levels to compute. Each level should be a number between 0 and 1. If multiple
-are provided, separate them with commas. Each value gives the the smallest
+are provided, separate them with commas. Each value gives the smallest
 area in which the animal has the given probability of being present. For
 instance, 0.95 would represent the area within which there is a 95% probability
 that the animal will be present. By default, uses `0.5, 0.95` to calculate the
@@ -137,7 +137,7 @@ cover the range (the model then has no area degrees of freedom). These
 animals are left out of all artefacts and of the output passed to the next
 App, so that models, UDs and tracking data stay aligned. A warning will alert
 you if any animals have been removed in this way. If all animals are removed,
-the app stops with an error.
+the App stops with an error.
 
 **Many isopleth levels:** Plots and maps become hard to read with many
 levels, as the contours of nearby levels overlap and their colours become
