@@ -56,8 +56,8 @@ Animals whose movement model is not range-resident are left out (see
 ### Input type
 `ctmm model with data`: a list with two elements:
 
-1. A list containing the selected `ctmm` model for each animal.
-2. The tracking data (an object of type `telemetry.list`).
+1. `model`: a list containing the selected `ctmm` model for each animal.
+2. `data`: the tracking data (an object of type `telemetry.list`).
 
 ### Output type
 `ctmm ud with data`: a list with three elements:
