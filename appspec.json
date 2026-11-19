@@ -4,7 +4,7 @@
     {
       "id": "isopleth_levels",
       "name": "Isopleth level(s)",
-      "description": "One or more coverage levels of the home range, between 0 and 1 and separated by commas. For example, 0.95 gives the smallest area in which the animal is found with 95% probability.",
+      "description": "Coverage level(s) used to draw home range contours and calculate home range areas. Values should be between 0 and 1. For example, 0.95 gives the smallest area within which the animal has a 95% probability of being present. If multiple values are provided, separate them with commas.",
       "defaultValue": "0.5, 0.95",
       "type": "STRING"
     }
