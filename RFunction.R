@@ -274,7 +274,8 @@ write_pdf <- function(file, telemetry, hr, levels) {
 
   for (level in levels) {
     par(mar = plot_mar)
-    plot(telemetry, UD = hr, level.UD = level, col = animal_cols,
+    plot(telemetry, UD = hr, level.UD = level,
+         col = grDevices::adjustcolor(animal_cols, alpha.f = 0.4),
          col.UD = grDevices::adjustcolor(animal_cols, alpha.f = 0.8),
          col.level = animal_cols,
          col.grid = NA)
