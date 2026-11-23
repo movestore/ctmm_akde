@@ -81,23 +81,37 @@ rFunction <- function(data, isopleth_levels) {
   logger.info("Writing UD rasters (uds.zip)")
   targetDirUDs <- tempfile("uds")
   dir.create(targetDirUDs)
+
+  # Ensure that file names that come from animal names are valid and unique
+  file_names <- raster_file_names(names(hr))
+  renamed <- file_names != paste0(names(hr), ".tif")
   
-  purrr::walk(
-    names(hr),
-    function(id) {
-      writeRaster(
-        hr[[id]],
-        file.path(targetDirUDs, paste0(id, ".tif")),
-        overwrite = TRUE
+  if (any(renamed)) {
+    logger.warn(
+      paste0(
+        "Renaming animal IDs that would produce invalid file names: ",
+        paste0(names(hr)[renamed], " -> ", file_names[renamed], collapse = ", ")
       )
+    )
+  }
+
+  file_paths <- file.path(targetDirUDs, file_names)
+
+  # Write zip contents and compress
+  purrr::walk2(
+    names(hr),
+    file_paths,
+    function(id, path) {
+      writeRaster(hr[[id]], path, overwrite = TRUE)
     }
   )
-  
+
   zip::zip(
     zipfile = appArtifactPath("uds.zip"),
-    files = list.files(targetDirUDs, full.names = TRUE, pattern = "tif$"),
+    files = file_paths,
     mode = "cherry-pick"
   )
+
   logger.info(paste0("All artefacts written after ", elapsed()))
 
   # List elements need names for cargo agent analyzer. Note that some apps
@@ -130,6 +144,41 @@ parse_levels <- function(isopleth_levels) {
   sort(unique(levels))
 }
 
+# Replace dangerous characters in animal names with underscores to ensure
+# output .tif files have valid file names. Ensures that converted file
+# names are unique.
+raster_file_names <- function(ids) {
+  file_names <- fs::path_sanitize(ids, replacement = "_")
+  file_names <- substr(file_names, 1, 50)
+  file_names <- sub("^\\.", "_", file_names)
+  file_names[file_names == ""] <- "animal"
+
+  # make.unique() appends "_1", "_2", ... to repeats. Run it on lower case
+  # names so that case-only clashes count, then copy the suffix over.
+  lower <- tolower(file_names)
+  unique_lower <- make.unique(lower, sep = "_")
+  suffix <- substring(unique_lower, nchar(lower) + 1)
+
+  paste0(file_names, suffix, ".tif")
+}
+
+# Symmetric difference of a list of geometries. Merges them in pairs, then the
+# results in pairs, and so on until one is left. The result is the same as
+# merging them one after another, but much faster for contours with many rings
+# (e.g. occurrence distributions), because each step works on small geometries.
+sym_difference_all <- function(geoms) {
+  while (length(geoms) > 1) {
+    firsts <- seq(1, length(geoms) - 1, by = 2)
+    merged <- lapply(firsts, function(i) sf::st_sym_difference(geoms[[i]], geoms[[i + 1]]))
+    # With an odd number, the last geometry moves on to the next round as is
+    if (length(geoms) %% 2 == 1) {
+      merged <- c(merged, geoms[length(geoms)])
+    }
+    geoms <- merged
+  }
+  geoms[[1]]
+}
+
 # Generate contour polygons for the home range at the given isopleth level.
 # This ensures that internal holes within the home range contours are
 # correctly left unfilled. At the time of writing, there is a bug in ctmm
@@ -143,7 +192,7 @@ ud_contours <- function(ud, level.UD) {
   # number of rings and drops the areas inside an even number (holes).
   geometries <- lapply(spdf@polygons, function(contour) {
     rings <- lapply(contour@Polygons, function(ring) sf::st_polygon(list(ring@coords)))
-    geom <- Reduce(sf::st_sym_difference, rings)
+    geom <- sym_difference_all(rings)
 
     # Rings that touch can leave zero-width line fragments in the result.
     # Keep only the polygon parts.
@@ -274,7 +323,8 @@ write_pdf <- function(file, telemetry, hr, levels) {
 
   for (level in levels) {
     par(mar = plot_mar)
-    plot(telemetry, UD = hr, level.UD = level, col = animal_cols,
+    plot(telemetry, UD = hr, level.UD = level,
+         col = grDevices::adjustcolor(animal_cols, alpha.f = 0.4),
          col.UD = grDevices::adjustcolor(animal_cols, alpha.f = 0.8),
          col.level = animal_cols,
          col.grid = NA)
